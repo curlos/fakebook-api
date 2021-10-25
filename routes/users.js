@@ -77,7 +77,13 @@ router.put('/:id/follow', async (req, res) => {
 
         res.status(200).json({updatedUser, updatedCurrentUser})
       } else {
-        res.status(403).json('You already follow this user')
+        await user.updateOne({ $pull: { followers: req.body.userId }})
+        await currentUser.updateOne({ $pull: { followings: req.params.id }})
+
+        const updatedUser = await User.findOne({_id: req.body.userId})
+        const updatedCurrentUser = await User.findOne({_id: req.params.id})
+
+        res.status(200).json({updatedUser, updatedCurrentUser})
       }
     } catch (err) {
       res.status(500).json(err)
@@ -87,30 +93,25 @@ router.put('/:id/follow', async (req, res) => {
   }
 })
 
+// get a user
+router.get('/followers/:id', async (req, res) => {
+  let allFollowers = []
 
-// unfollow a user
-router.put('/:id/unfollow', async (req, res) => {
-  if (req.body.userId !== req.params.id) {
-    try {
-      const user = await User.findById(req.params.id)
-      const currentUser = await User.findById(req.body.userId)
+  try {
+    const user = await User.findOne({_id: req.params.id})
 
-      if (user.followers.includes(req.body.userId)) {
-        await user.updateOne({ $pull: { followers: req.body.userId }})
-        await currentUser.updateOne({ $pull: { followings: req.params.id }})
-
-        const updatedUser = await User.findOne({_id: req.body.userId})
-        const updatedCurrentUser = await User.findOne({_id: req.params.id})
-
-        res.status(200).json({updatedUser, updatedCurrentUser})
-      } else {
-        res.status(403).json('You don\'t follow this user')
-      }
-    } catch (err) {
-      res.status(500).json(err)
+    if (!user) {
+      res.status(404).json('user not found')
     }
-  } else {
-    res.status(403).json(`You can't unfollow yourself`)
+
+    for (let followerID of user.followers) {
+      const follower = await User.findOne({_id: followerID})
+      allFollowers = [...allFollowers, follower]
+    }
+
+    res.status(200).json(allFollowers)
+  } catch (err) {
+    res.status(500).json({ error: err })
   }
 })
 
